@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pong Game - Espaço</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { overflow: hidden; background: #000; display: flex; justify-content: center; align-items: center; color: white; font-family: Arial, sans-serif; }
+        canvas { display: block; }
+        #historyModal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            color: white;
+        }
+        #historyContent {
+            background: #333;
+            padding: 20px;
+            max-width: 400px;
+            max-height: 80%;
+            overflow-y: auto;
+        }
+        #closeHistory {
+            margin-top: 10px;
+            padding: 5px 10px;
+            background-color: red;
+            color: white;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div id="historyModal">
+        <div id="historyContent">
+            <h3>Histórico de Partidas</h3>
+            <ul id="historyList"></ul>
+            <button id="closeHistory">Fechar</button>
+        </div>
+    </div>
+
+    <canvas id="pongCanvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById("pongCanvas");
+        const ctx = canvas.getContext("2d");
+
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        window.addEventListener("resize", resizeCanvas);
+        resizeCanvas();
+
+        const paddleWidth = 10, paddleHeight = 200, paddleSpeed = 16;
+        const player1 = { x: 0, y: canvas.height / 2 - paddleHeight / 2, score: 0, name: "Rhuan" };
+        const aiPlayer = { x: canvas.width - paddleWidth, y: canvas.height / 2 - paddleHeight / 2, score: 0, name: "IA" };
+
+        const ball = { 
+            x: canvas.width / 2, 
+            y: canvas.height / 2, 
+            radius: 10, 
+            speedX: 6, 
+            speedY: 6, 
+            speedIncrease: 1.1
+        };
+
+        let matchHistory = [];  // Array para armazenar o histórico de partidas
+
+        const stars = [];
+        const numStars = 100;
+
+        function createStars() {
+            for (let i = 0; i < numStars; i++) {
+                stars.push({
+                    x: Math.random() * canvas.width,
+                    y: Math.random() * canvas.height,
+                    radius: Math.random() * 2,
+                    speed: Math.random() * 0.5 + 0.5
+                });
+            }
+        }
+        createStars();
+
+        function drawStars() {
+            ctx.fillStyle = "white";
+            stars.forEach(star => {
+                ctx.beginPath();
+                ctx.arc(star.x, star.y, star.radius, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.closePath();
+            });
+        }
+
+        function updateStars() {
+            stars.forEach(star => {
+                star.y += star.speed;
+                if (star.y > canvas.height) {
+                    star.y = 0;
+                    star.x = Math.random() * canvas.width;
+                }
+            });
+        }
+
+        function drawPaddle(x, y) {
+            ctx.fillStyle = "white";
+            ctx.fillRect(x, y, paddleWidth, paddleHeight);
+        }
+
+        function drawBall() {
+            ctx.beginPath();
+            ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
+            ctx.fillStyle = "white";
+            ctx.fill();
+            ctx.closePath();
+        }
+
+        function updateBall() {
+            ball.x += ball.speedX;
+            ball.y += ball.speedY;
+
+            if (ball.y + ball.radius > canvas.height || ball.y - ball.radius < 0) {
+                ball.speedY *= -1;
+            }
+
+            if (ball.x - ball.radius < player1.x + paddleWidth && ball.y > player1.y && ball.y < player1.y + paddleHeight) {
+                ball.speedX *= -1;
+                increaseBallSpeed();
+            }
+            if (ball.x + ball.radius > aiPlayer.x && ball.y > aiPlayer.y && ball.y < aiPlayer.y + paddleHeight) {
+                ball.speedX *= -1;
+                increaseBallSpeed();
+            }
+
+            if (ball.x - ball.radius < 0) {
+                aiPlayer.score++;
+                checkGameOver();
+                resetBall();
+            } else if (ball.x + ball.radius > canvas.width) {
+                player1.score++;
+                checkGameOver();
+                resetBall();
+            }
+        }
+
+        function increaseBallSpeed() {
+            ball.speedX *= ball.speedIncrease;
+            ball.speedY *= ball.speedIncrease;
+        }
+
+        function resetBall() {
+            ball.x = canvas.width / 2;
+            ball.y = canvas.height / 2;
+            ball.speedX = 6;
+            ball.speedY = 6;
+        }
+
+        function checkGameOver() {
+            if (player1.score === 5 || aiPlayer.score === 5) {
+                const winner = player1.score === 5 ? player1.name : aiPlayer.name;
+                const loser = player1.score === 5 ? aiPlayer.name : player1.name;
+                matchHistory.push(`${winner} venceu ${loser} - Placar Final: ${player1.score} x ${aiPlayer.score}`);
+                player1.score = 0;
+                aiPlayer.score = 0;
+            }
+        }
+
+        function drawScore() {
+            ctx.font = "20px Arial";
+            ctx.textAlign = "center";
+            ctx.fillText(player1.name, canvas.width / 4, 30);
+            ctx.fillText(aiPlayer.name, 3 * canvas.width / 4, 30);
+            
+            ctx.font = "30px Arial";
+            ctx.fillText(player1.score, canvas.width / 4, 70);
+            ctx.fillText(aiPlayer.score, 3 * canvas.width / 4, 70);
+        }
+
+        const keys = {};
+
+        document.addEventListener("keydown", (event) => {
+            keys[event.key] = true;
+        });
+
+        document.addEventListener("keyup", (event) => {
+            keys[event.key] = false;
+        });
+
+        function movePaddles() {
+            if (keys["w"] && player1.y > 0) {
+                player1.y -= paddleSpeed;
+            }
+            if (keys["s"] && player1.y < canvas.height - paddleHeight) {
+                player1.y += paddleSpeed;
+            }
+        }
+
+        function moveAI() {
+            if (aiPlayer.y + paddleHeight / 2 < ball.y) {
+                aiPlayer.y += paddleSpeed * 0.8; // A IA se move para baixo
+            } else {
+                aiPlayer.y -= paddleSpeed * 0.8; // A IA se move para cima
+            }
+
+            // Limitar o movimento da IA dentro da tela
+            if (aiPlayer.y < 0) aiPlayer.y = 0;
+            if (aiPlayer.y > canvas.height - paddleHeight) aiPlayer.y = canvas.height - paddleHeight;
+        }
+
+        function update() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            updateStars();
+            drawStars();
+
+            movePaddles();
+            moveAI();
+            drawPaddle(player1.x, player1.y);
+            drawPaddle(aiPlayer.x, aiPlayer.y);
+            drawBall();
+            drawScore();
+
+            updateBall();
+
+            requestAnimationFrame(update);
+        }
+
+        // Função para exibir o histórico
+        function showHistory() {
+            const historyList = document.getElementById("historyList");
+            historyList.innerHTML = "";  // Limpa o histórico
+            matchHistory.forEach((match, index) => {
+                const li = document.createElement("li");
+                li.textContent = match;
+                historyList.appendChild(li);
+            });
+            document.getElementById("historyModal").style.display = "flex";
+        }
+
+        // Função para fechar o modal de histórico
+        document.getElementById("closeHistory").addEventListener("click", () => {
+            document.getElementById("historyModal").style.display = "none";
+        });
+
+        // Detecta quando a tecla "H" for pressionada
+        document.addEventListener("keydown", (event) => {
+            if (event.key === "h" || event.key === "H") {
+                showHistory();
+            }
+        });
+
+        update();
+    </script>
+</body>
+</html>
